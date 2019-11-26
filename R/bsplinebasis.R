@@ -1,4 +1,3 @@
-#' @export
 bsplinebasis <- function(x, t, M) {
 
   ############################################################################
@@ -40,7 +39,6 @@ bsplinebasis <- function(x, t, M) {
   return(B)
 }
 
-#' @export
 bsplinebasisj <- function(x, t, j, M = 4) {
 
   # bsplineBasis: compute a bspline basis function of order m.

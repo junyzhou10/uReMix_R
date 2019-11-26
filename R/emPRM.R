@@ -28,14 +28,14 @@ emPRM <- function(X, Y, p, nknots, verbose = TRUE) {
   Pik <- 1 / K * ones(K, 1)
 
    # Initialize the regression parameters and the variances
-  Betak <-  zeros(p+1, n)
+  Betak <-  zeros(p + 1, n)
   Sigmak2 <- zeros(K, 1)
 
   for (k in 1:K) {
 
     # ------- step 2  (27)  ------- #
     # Betak  = inv(Phi'*Phi + 1e-4*eye(dimBeta))*Phi'*Y_in(k,:)';
-    betak <- solve(crossprod(X, X), t(X) %*% Y[k, ]) # Inversion problem for spline of order 1 (polynomial degree=1)
+    betak <- solve(crossprod(X, X), t(X) %*% Y[k, ], tol = 0) # Inversion problem for spline of order 1 (polynomial degree=1)
     Betak[, k] <- betak
     muk <- X %*% betak
     # Dk = sum((reshape(X,n,m) - reshape(muk',n,m)).^2, 2);

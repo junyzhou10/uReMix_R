@@ -1,4 +1,3 @@
-#' @export
 splinebasis <- function(x, knots, M) {
 
   # X = splinebasis(x,knots,M)
