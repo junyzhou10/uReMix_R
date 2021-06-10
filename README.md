@@ -5,7 +5,7 @@ This is a branch from chamroukhi/uReMix_R, which does not provide an R package.
 I adjusted the codes and put it in the R package framework so that user could directly install it by 
 
 ```r
-devtools::install_github("https://github.com/junyzhou10/uReMix_R")
+devtools::install_github("https://github.com/junyzhou10/uReMix_R/tree/packageVersion")
 ```
 
 
