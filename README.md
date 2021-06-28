@@ -2,6 +2,10 @@
 
 This is a branch from chamroukhi/uReMix_R, which does not provide an R package.
 
+This longitudinal data clustering method relies on the assumption of normal error and ignore the within-subject correlations during the model set-up. The mixtures are all linear models, and can be solved straightforwardly by EM algorithm.
+
+The most appealing feature of this method is it can determine the number of clusters automatically through an Robust EM framework. As for most model-based longitudinal data clustering algorithms, people need to pre-specify the number of clusters ahead of time to obtain the expression of likelihood function.
+
 I adjusted the codes and wrap it as an R package so that user could directly install it by 
 
 ```r
