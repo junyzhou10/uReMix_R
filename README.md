@@ -11,4 +11,8 @@ devtools::install_github("https://github.com/junyzhou10/uReMix_R/tree/packageVer
 
 # Usage
 
-The main function is `emSRM(X, Y, ...)`, where X is the observation time which should be stored in long form, and Y is the observations stored in wide form. Currently, the X needs not to be regular, but the number of observations are required to be the same.
+The main function is `emSRM(X, Y, ...)`, where X is the observation time which should be stored in long form, and Y is the observations stored in wide form. The observation time X needs to be regular, i.e. the total number of observations are the same and aligned for each subjects.
+
+---
+
+Now I created another function `emSRM(X, Y, id, ...)` which is able to handle irregular longitudinal data. 
