@@ -29,3 +29,7 @@ emSRM(
 \description{
 Robust EM algorithm for Spline Regression Mixture Model (SRM)
 }
+\examples{
+test = generateToyDataset(n1 = 40, n2 = 30, n3 = 30)
+output = emSRM(rep(test$x, 100), test$Y, 3,splineType = "B-spline", 3)
+}

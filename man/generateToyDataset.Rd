@@ -10,7 +10,7 @@ generateToyDataset(n1 = 40, n2 = 30, n3 = 30)
 \item{n1, n2, n3}{number of subjects for each group}
 }
 \value{
-Y is the data; Z stores the labels
+x is the observation time points; Y is the data saved in wide form; Z stores the labels
 }
 \description{
 Simulate an example data with 100 observations for each trajectory

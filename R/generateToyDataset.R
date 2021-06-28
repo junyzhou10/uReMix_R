@@ -1,6 +1,6 @@
 #' Simulate an example data with 100 observations for each trajectory
 #' @param n1,n2,n3 number of subjects for each group
-#' @return Y is the data; Z stores the labels
+#' @return x is the observation time points; Y is the data saved in wide form; Z stores the labels
 #' @export
 generateToyDataset <- function(n1 = 40, n2 = 30, n3 = 30) {
 

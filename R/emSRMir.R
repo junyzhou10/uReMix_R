@@ -1,21 +1,27 @@
-#' Robust EM algorithm for Spline Regression Mixture Model (SRM)
+#' Robust EM algorithm for Spline Regression Mixture Model (SRM) with Irregular observations
 #' @param X observation times, long form [n*m, 1], i.e. n subjects each with m observations, observation time can be irregular
-#' @param Y observed outcomes, wide form [n, m]
+#' @param Y observed outcomes, long form [n*m, 1]
+#' @param id subject indicators to tell which data belongs to which subject [n*m, 1]
 #' @param splineOrder B-Spline order
 #' @param splineType select between c("spline", "B-spline") indicating either natural cubic spline or b-splines
 #' @param nknots number of internal knots selected equally
 #' @param verbose Screen output?
-#' @import splines
+#' @param MaxIter Maximum iteration
+#' @import splines MASS
 #' @examples
 #' test = generateToyDataset(n1 = 40, n2 = 30, n3 = 30)
-#' output = emSRM(rep(test$x, 100), test$Y, 3,splineType = "B-spline", 3)
+#' X  = rep(test$x, 100)
+#' id = rep(seq(100), each = 100)
+#' Y  = matrix(t(test$Y), ncol = 1)
+#' output = emSRMir(X, Y, id, 3, splineType = "B-spline", 3)
 #' @export
-emSRM <- function(X, Y, splineOrder, splineType = c("spline", "B-spline"), nknots, verbose = TRUE) {
+emSRMir <- function(X, Y, id, splineOrder, splineType = c("spline", "B-spline"), nknots, verbose = TRUE, MaxIter = 1000) {
 
   splineType <- match.arg(splineType)
 
-  n <- nrow(Y)
-  m <- ncol(Y)
+  # n <- nrow(Y)
+  # m <- ncol(Y)
+  n = length(unique(id))
 
   M <- splineOrder
   dimBeta <- M + nknots
@@ -27,6 +33,11 @@ emSRM <- function(X, Y, splineOrder, splineType = c("spline", "B-spline"), nknot
     Xstack = ns( X, intercept = T, df = nknots+2+2)
   }
 
+  x.list = split(as.data.frame(Xstack),  id)
+  x.list = lapply(x.list, data.matrix)
+  Y.dat  = apply(data.matrix(Y), 2, scale) # in case input Y is a vector
+  y.list = split(as.data.frame(Y.dat),  id)
+  y.list = lapply(y.list, data.matrix)
 
   # Threshold for testing the convergence
   Epsilon <- 1e-6
@@ -36,12 +47,18 @@ emSRM <- function(X, Y, splineOrder, splineType = c("spline", "B-spline"), nknot
   K <- n
   # -----------(28) ---------------- #
   gama <- 1e-6
-  Ystack <- t(matrix(data = t(as.numeric(repmat(t(Y), n, 1))), nrow = m)) # [nxn x m];
-  dij <- apply( (Ystack - repmat(Y, n, 1)) ^ 2, 1, sum)
-  dmin <- min(dij[dij > 0])
-  Q <- dmin
+  # Ystack <- t(matrix(data = t(as.numeric(repmat(t(Y), n, 1))), nrow = m)) # [nxn x m];
+  # dij <- apply( (Ystack - repmat(Y, n, 1)) ^ 2, 1, sum)
+  # dmin <- min(dij[dij > 0])
+  XX.wait = crossprod(Xstack)
+  Xy.wait = crossprod(Xstack, t(t(Y.dat)))
+  Y2.wait = colSums(Y.dat^2)
+  SSR.all = Y2.wait - diag(t(Xy.wait) %*% ginv(XX.wait) %*% Xy.wait)
+  e.sigma = (SSR.all)/(nrow(Xstack) - dimBeta)
+  Q <- e.sigma
 
-  Ytild <- matrix(data = t(Y), ncol = 1)
+  # Ytild <- matrix(data = t(Y), ncol = 1) # long form now
+  Ytild <- Y.dat
 
   # Initialize the mixing proportions
   Alphak <- 1 / K * ones(K, 1)
@@ -52,19 +69,19 @@ emSRM <- function(X, Y, splineOrder, splineType = c("spline", "B-spline"), nknot
   Sigmak2 <- zeros(K, 1)
 
   for (k in 1:K) {
-    x = Xstack[((k-1)*m+1):(k*m), ]
-    # ------- step 2  (27)  ------- #
-    # Betak  = inv(Phi'*Phi + 1e-4*eye(dimBeta))*Phi'*Y_in(k,:)';
-    betak <- solve(crossprod(x, x) + 1e-6 * diag(dimBeta), t(x) %*% Y[k, ]) # Inversion problem for spline of order 1 (polynomial degree=1)
+    x.in    = x.list[[k]]
+    y.in    = y.list[[k]]
+    N.in    = dim(x.in)[k]
+    XX      = crossprod(x.in) # faster than t(x.in) %*% x.in
+    A.mat   = ginv(XX)
+    Xy      = crossprod(x.in, t(t(y.in))) # t(x.in) %*% t(t(y.in))
+    Y2      = colSums(y.in^2)
+    SSR0    = diag(Y2 - t(Xy) %*% A.mat %*% Xy)
+    betak   = crossprod(A.mat, Xy)
     Betak[, k] <- betak
-    muk <- x %*% betak
-    # Dk = sum((reshape(X,n,m) - reshape(muk',n,m)).^2, 2);
-    Dk <- apply( (Y - ones(n, 1) %*% t(muk)) ^ 2, MARGIN = 1, sum)
-    Dk <- sort(Dk)
-
-    # Sigmak2(k)=  1/m*max(Dk);#Dk(ceil(sqrt(K)));#Dk(ceil(sqrt(K)));#.001;##;#
-    Sigmak2[k] <- Dk[ceiling(sqrt(K))] # Dk(ceil(sqrt(K)));#.001;##;#
-    # Sigmak2(k) = sum(Y_in(k,:)' - muk);
+    Dk      = unlist(lapply(split((Y.dat - Xstack %*% betak)^2, id), sum))
+    Dk      <- sort(Dk)
+    Sigmak2[k] <- Dk[ceiling(sqrt(K))]
 
     # 1/m added/removed recently; or Dk(end)
     # --------------------------- #
@@ -82,7 +99,7 @@ emSRM <- function(X, Y, splineOrder, splineType = c("spline", "B-spline"), nknot
   #                           #
   #############################
   PikFik <- zeros(n, K)
-  log_fk_xij <- zeros(n * m, K)
+  log_fk_xij <- zeros(nrow(Xstack), K)
   log_Pik_fk_Xi <- zeros(n, K)
   log_Pik_Fik <- zeros(n, K)
 
@@ -96,7 +113,7 @@ emSRM <- function(X, Y, splineOrder, splineType = c("spline", "B-spline"), nknot
     z <- ((Ytild - Xstack %*% betak) ^ 2) / sigmak2
     log_fk_xij[, k] <- -0.5 * (log(2 * pi) + log(sigmak2)) - 0.5 * z  # [nxm x 1] : univariate Gaussians
     # log-lik for the expected n_k curves of cluster k
-    log_fk_Xi <- apply(X = matrix(data = log_fk_xij[, k], m, n), MARGIN = 2, sum) # [n x m]:  sum over j=1,...,m: fk_Xi = prod_j sum_k pi_{jk} N(x_{ij},mu_{k},s_{k))
+    log_fk_Xi <- unlist(lapply(split(log_fk_xij[,k], id), sum)) #  sum over j=1,...,m: fk_Xi = prod_j sum_k pi_{jk} N(x_{ij},mu_{k},s_{k))
     log_Pik_fk_Xi[, k] <- log(pik) + log_fk_Xi # [n x K]
 
     log_Pik_Fik[, k] <- log_Pik_fk_Xi[, k]
@@ -117,7 +134,6 @@ emSRM <- function(X, Y, splineOrder, splineType = c("spline", "B-spline"), nknot
   stored_J <- c() # to store the maximized penalized log-likelihood criterion
   pen_loglik_old <- -Inf
   iter <- 1 # iteration number
-  MaxIter <- 1000
   converged <- FALSE
   stored_K <- c() # To store the estimatde number of clusters at each iteration
 
@@ -145,8 +161,7 @@ emSRM <- function(X, Y, splineOrder, splineType = c("spline", "B-spline"), nknot
       tauik <- Tauik[, k]
       # ------Step 4 (25) ---------- #
       # Update of the regression coefficients
-      temp <- repmat(tauik, 1, m) # [m x n]
-      Wk <- matrix(data = t(temp), ncol = 1) # cluster_weights(:)% [mn x 1]
+      Wk <- matrix(rep(tauik, table(id)), ncol = 1) # cluster_weights(:)% [mn x 1]
       # meme chose
       # temp =  repmat(tauik,1,m)';% [m x n]
 
@@ -171,7 +186,8 @@ emSRM <- function(X, Y, splineOrder, splineType = c("spline", "B-spline"), nknot
     # ------- step 6 (24)  ------- #
     # update beta
     E <- sum(AlphakOld * log(AlphakOld))
-    eta <- min(1, 0.5 ^ floor((m / 2) - 1))
+    # eta <- min(1, 0.5 ^ floor((median(table(id)) / 2) - 1))
+    eta <- min(1, 0.5 ^ floor((max(table(id)) / 2) - 1))
     pik_max <- max(Pik)
     alphak_max <- max(AlphakOld)
     Beta <- min(sum(exp(-eta * n * abs(Alphak - AlphakOld))) / K, (1 - pik_max) / (-alphak_max * E))
@@ -218,8 +234,9 @@ emSRM <- function(X, Y, splineOrder, splineType = c("spline", "B-spline"), nknot
     for (k in 1:K) {
       tauik <- Tauik[, k]
 
-      temp <- repmat(tauik, 1, m)
-      Wk = matrix(data = t(temp), ncol = 1)
+      # temp <- repmat(tauik, 1, m)
+      # Wk = matrix(data = t(temp), ncol = 1)
+      Wk <- matrix(rep(tauik, table(id)), ncol = 1)
       wYk <- sqrt(Wk) * Ytild
       wXk <- sqrt(Wk %*% ones(1, dimBeta)) * Xstack
 
@@ -248,7 +265,7 @@ emSRM <- function(X, Y, splineOrder, splineType = c("spline", "B-spline"), nknot
       z <- ((Ytild - Xstack %*% betak) ^ 2) / sigmak2
       log_fk_xij[, k] <- -0.5 * (log(2 * pi) + log(sigmak2)) - 0.5 * z # [nxm x 1]
       # log-lik for the n_k curves of cluster k
-      log_fk_Xi <- apply(X = matrix(data = log_fk_xij[, k], nrow = m, ncol = n), MARGIN = 2, sum) # [n x m]:  sum over j=1,...,m: fk_Xi = prod_j sum_k pi_{jk} N(x_{ij},mu_{k},s_{k))
+      log_fk_Xi <- unlist(lapply(split(log_fk_xij[,k], id), sum))
       log_Pik_fk_Xi[, k] <- log(alphak) + log_fk_Xi # [nxK]
 
       log_Pik_Fik[, k] <- log_Pik_fk_Xi[, k]
@@ -282,8 +299,9 @@ emSRM <- function(X, Y, splineOrder, splineType = c("spline", "B-spline"), nknot
       # pik(k) = sum(tauik)/n;
 
       # update of the regression coefficients
-      temp <- repmat(tauik, 1, m)
-      Wk <- matrix(data = t(temp), ncol = 1) # cluster_weights
+      # temp <- repmat(tauik, 1, m)
+      # Wk <- matrix(data = t(temp), ncol = 1) # cluster_weights
+      Wk <- matrix(rep(tauik, table(id)), ncol = 1)
       wYk <- sqrt(Wk) * Ytild
       wXk <- sqrt(Wk %*% ones(1, dimBeta)) * Xstack
       # maximization w.r.t betak: Weighted least squares
