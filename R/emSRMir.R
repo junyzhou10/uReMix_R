@@ -332,7 +332,7 @@ emSRMir <- function(X, Y, id, splineOrder, splineType = c("spline", "B-spline"),
   gmm_density <- apply(PikFik, MARGIN = 1, sum)
 
   params <- list()
-  params$label <- klas
+  params$label <- cbind(unique(id), klas)
   params$Pik <- Pik
   params$Alphak <- Alphak
   params$Betak <- Betak
